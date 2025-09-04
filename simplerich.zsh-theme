@@ -36,11 +36,8 @@ _simplerich_current_time_millis() {
 }
 
 _simplerich_update_git_info() {
-    if [ -n "$__CURRENT_GIT_STATUS" ]; then
-        _SIMPLERICH_GIT_INFO=$(git_super_status)
-    else
-        _SIMPLERICH_GIT_INFO=$(_omz_git_prompt_info)
-    fi
+    # Always use the standard Oh-My-Zsh git prompt for immediate updates
+    _SIMPLERICH_GIT_INFO=$(_omz_git_prompt_info)
 }
 
 # command execute before
@@ -124,35 +121,18 @@ precmd() { # cspell:disable-line
 # set option
 setopt PROMPT_SUBST # cspell:disable-line
 
-# timer
-#REF: https://stackoverflow.com/questions/26526175/zsh-menu-completion-causes-problems-after-zle-reset-prompt
-TMOUT=1
-TRAPALRM() { # cspell:disable-line
-    # $(git_prompt_info) cost too much time which will raise stutters when inputting. so we need to disable it in this occurrence.
-    # if [ "$WIDGET" != "expand-or-complete" ] && [ "$WIDGET" != "self-insert" ] && [ "$WIDGET" != "backward-delete-char" ]; then
-    # black list will not enum it completely. even some pipe broken will appear.
-    # so we just put a white list here.
-    if [ "$WIDGET" = "" ] || [ "$WIDGET" = "accept-line" ]; then
-        zle reset-prompt
-    fi
+# timer - DISABLED for instant git updates
+# TMOUT=1
+# TRAPALRM() {
+#     # Timer-based updates disabled for faster response
+# }
 
-    if [ "$_SIMPLERICH_PROMPT_CALLED_COUNT" -eq 0 ]; then
-        _simplerich_update_git_info
-    fi
-
-    local count="$((_SIMPLERICH_PROMPT_CALLED_COUNT + 1))"
-    if [ "$count" -ge 10 ]; then
-        count=0
-    fi
-    export _SIMPLERICH_PROMPT_CALLED_COUNT=$count
-}
-
-# git
+# git - Updated colors for dark theme
 ZSH_THEME_GIT_PROMPT_PREFIX="%{$fg[green]%}["
 ZSH_THEME_GIT_PROMPT_SUFFIX="%{$fg[green]%}]%{$reset_color%}"
 ZSH_THEME_GIT_PROMPT_DIRTY="  %{$fg[yellow]%}*"
 
-# zsh-git-prompt
+# zsh-git-prompt - Updated colors for dark theme
 ZSH_THEME_GIT_PROMPT_SEPARATOR=" "
 ZSH_THEME_GIT_PROMPT_BRANCH="%{$fg[green]%}"
 ZSH_THEME_GIT_PROMPT_STAGED="%{$fg[yellow]%}%{+%G%}"
@@ -207,32 +187,52 @@ git_super_status() {
 _simplerich_prompt() {
     real_time() {
         # echo "[%*]";
-        echo "[$(date +%H:%M:%S)]"
+        echo "%{$fg[white]%}[$(date +%H:%M:%S)]%{$reset_color%}"
     }
 
     user_info() {
-        echo "%n"
+        echo "%{$fg[white]%}%n%{$reset_color%}"
     }
 
     python_info() {
         if [ -v VIRTUAL_ENV ]; then
-            echo "%{$fg[magenta]%}($(basename ${VIRTUAL_ENV}))%{$reset_color%}"
+            local parent=$(dirname ${VIRTUAL_ENV})
+            echo "%{$fg[cyan]%}($(basename ${parent}))%{$reset_color%}"
         elif [ -v CONDA_DEFAULT_ENV ]; then
-            echo "%{$fg[magenta]%}(${CONDA_DEFAULT_ENV})%{$reset_color%}"
+            echo "%{$fg[cyan]%}(${CONDA_DEFAULT_ENV})%{$reset_color%}"
         fi
     }
 
     directory_info() {
         #    echo "%c";
-        echo "%{$fg[cyan]%}${PWD/#$HOME/~}%{$reset_color%}"
+        echo "%{$fg[blue]%}${PWD/#$HOME/~}%{$reset_color%}"
     }
 
     git_info() {
-        echo "${_SIMPLERICH_GIT_INFO}"
+        # Custom git info with proper spacing and status-based coloring
+        local git_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+        if [ -n "$git_branch" ]; then
+            local git_status=""
+            local git_color=""
+            
+            # Check if working tree is clean
+            if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+                # Dirty working tree - yellow color
+                git_color="%{$fg[yellow]%}"
+                git_status=" %{$fg[yellow]%}*%{$reset_color%}"
+            else
+                # Clean working tree - green color
+                git_color="%{$fg[green]%}"
+                git_status=" %{$fg[green]%}✔%{$reset_color%}"
+            fi
+            
+            # Color the entire git section based on status
+            echo "${git_color}(${git_branch}${git_status})%{$reset_color%}"
+        fi
     }
 
     command_status() {
-        echo "${_SIMPLERICH_COMMAND_STATUS}"
+        echo "%{$fg[white]%}${_SIMPLERICH_COMMAND_STATUS}%{$reset_color%}"
     }
 
     if [ -v VIRTUAL_ENV ] || [ -v CONDA_DEFAULT_ENV ]; then
